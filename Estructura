@@ -26,14 +26,22 @@ def draw_text(text, x, y, color=BLACK):
 
 # Clase Bullet
 class Bullet:
-    def __init__(self, x, y):
+    def __init__(self, x, y, angle):
         self.x = x
         self.y = y
         self.speed = 6
+        self.angle = angle
         self.rect = pygame.Rect(self.x, self.y, 10, 10)
     
     def move(self):
-        self.x += self.speed
+        if self.angle == 0:  # Mueve a la derecha
+            self.x += self.speed
+        elif self.angle == 180:  # Mueve a la izquierda
+            self.x -= self.speed
+        elif self.angle == 270:  # Mueve hacia arriba
+            self.y -= self.speed
+        elif self.angle == 90:  # Mueve hacia abajo
+            self.y += self.speed
         self.rect.topleft = (self.x, self.y)
     
     def draw(self):
@@ -47,27 +55,55 @@ class Player:
         self.speed = 4
         self.rect = pygame.Rect(self.x, self.y, 40, 40)
         self.defending = False
-    
+        # Cargar la imagen del jugador
+        try:
+            self.image = pygame.image.load("player1.jpg")  # Cambié el nombre de 'player.jpg' a 'player1.jpg'
+            self.image = pygame.transform.scale(self.image, (40, 40))  # Escalar la imagen
+        except pygame.error:
+            print("No se pudo cargar la imagen 'player1.jpg'. Usando un color de fondo.")
+            self.image = pygame.Surface((40, 40))  # Superficie de reemplazo
+            self.image.fill(RED)
+        self.angle = 0  # Ángulo de rotación inicial
+        self.bullets = []  # Lista de balas
+
     def move(self, keys):
         if keys[pygame.K_LEFT]:
             self.x -= self.speed
+            self.angle = 180  # Mira hacia la izquierda
         if keys[pygame.K_RIGHT]:
             self.x += self.speed
+            self.angle = 0  # Mira hacia la derecha
         if keys[pygame.K_UP]:
             self.y -= self.speed
+            self.angle = 270  # Mira hacia arriba
         if keys[pygame.K_DOWN]:
             self.y += self.speed
+            self.angle = 90  # Mira hacia abajo
         self.rect.topleft = (self.x, self.y)
-    
+
+        # Disparar automáticamente mientras se mueve
+        self.shoot()
+
     def draw(self):
-        color = GREEN if self.defending else RED
-        pygame.draw.rect(screen, color, self.rect)
-    
+        # Rotamos la imagen según el ángulo
+        rotated_image = pygame.transform.rotate(self.image, self.angle)
+        rotated_rect = rotated_image.get_rect(center=self.rect.center)  # Ajustamos el rectángulo de la imagen para que se dibuje correctamente
+        screen.blit(rotated_image, rotated_rect.topleft)  # Dibujamos la imagen rotada
+
+        # Dibujar las balas
+        for bullet in self.bullets:
+            bullet.move()
+            bullet.draw()
+            if bullet.x > WIDTH or bullet.x < 0 or bullet.y < 0 or bullet.y > HEIGHT:
+                self.bullets.remove(bullet)
+
     def defend(self, keys):
         self.defending = keys[pygame.K_SPACE]
     
-    def shoot(self, bullets):
-        bullets.append(Bullet(self.x + 40, self.y + 15))
+    def shoot(self):
+        # Solo disparar si el jugador se mueve
+        if len(self.bullets) < 5:  # Limitar el número de balas
+            self.bullets.append(Bullet(self.x + 40, self.y + 15, self.angle))  # Crear la bala según la dirección del jugador
 
 # Clase Enemy con Árbol de Comportamiento
 class Enemy:
@@ -118,71 +154,76 @@ def main_menu():
                     pygame.quit()
                     exit()
 
-# Bucle del juego
-ticking = True
-clock = pygame.time.Clock()
-while ticking:
-    state = main_menu()
-    paused = False
-    game_over = False
-    win = False
-    player = Player()
-    enemies = [Enemy(random.randint(200, 700), random.randint(200, 500)) for _ in range(3)]
-    bullets = []
-    
-    while state == "start" and not game_over and not win:
-        screen.fill(WHITE)
-        keys = pygame.key.get_pressed()
-        player.move(keys)
-        player.defend(keys)
-        player.draw()
+def game_loop():
+    ticking = True
+    clock = pygame.time.Clock()
+    while ticking:
+        state = main_menu()
+        paused = False
+        game_over = False
+        win = False
+        player = Player()
+        enemies = [Enemy(random.randint(200, 700), random.randint(200, 500)) for _ in range(3)]
         
-        if keys[pygame.K_SPACE]:
-            player.shoot(bullets)
-        
-        for bullet in bullets[:]:
-            bullet.move()
-            bullet.draw()
-            if bullet.x > WIDTH:
-                bullets.remove(bullet)
-        
-        for enemy in enemies[:]:
-            enemy.move_towards(player)
-            enemy.draw()
-            if enemy.attack(player):
-                game_over = True
-            
-            for bullet in bullets[:]:
-                if bullet.rect.colliderect(enemy.rect):
-                    enemies.remove(enemy)
-                    bullets.remove(bullet)
-                    break
-        
-        if not enemies:
-            win = True
-        
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                ticking = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_2:
-                    paused = not paused
-                if event.key == pygame.K_3:
-                    ticking = False
-        
-        pygame.display.flip()
-        clock.tick(30)
-    
-    if game_over:
-        screen.fill(WHITE)
-        draw_text("GAME OVER", WIDTH // 2 - 80, HEIGHT // 2, RED)
-        pygame.display.flip()
-        pygame.time.delay(2000)
-    
-    if win:
-        screen.fill(WHITE)
-        draw_text("YOU WIN!", WIDTH // 2 - 80, HEIGHT // 2, GREEN)
-        pygame.display.flip()
-        pygame.time.delay(2000)
+        while state == "start" and not game_over and not win:
+            screen.fill(WHITE)
+            keys = pygame.key.get_pressed()
+            player.move(keys)
+            player.defend(keys)
+            player.draw()
 
-pygame.quit()
+            for enemy in enemies[:]:
+                enemy.move_towards(player)
+                enemy.draw()
+                if enemy.attack(player):
+                    game_over = True
+                
+                for bullet in player.bullets[:]:
+                    if bullet.rect.colliderect(enemy.rect):
+                        enemies.remove(enemy)
+                        player.bullets.remove(bullet)
+                        break
+            
+            if not enemies:
+                win = True
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    ticking = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_2:
+                        paused = not paused
+                    if event.key == pygame.K_3:
+                        ticking = False
+            
+            if paused:
+                draw_text("PAUSE", WIDTH // 2 - 50, HEIGHT // 2, BLACK)
+                pygame.display.flip()
+                while paused:
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            ticking = False
+                            paused = False
+                        if event.type == pygame.KEYDOWN and event.key == pygame.K_2:
+                            paused = False
+                    pygame.time.delay(100)
+            else:
+                pygame.display.flip()
+                clock.tick(30)
+        
+        if game_over:
+            screen.fill(WHITE)
+            draw_text("GAME OVER", WIDTH // 2 - 80, HEIGHT // 2, RED)
+            pygame.display.flip()
+            pygame.time.delay(2000)
+        
+        if win:
+            screen.fill(WHITE)
+            draw_text("YOU WIN!", WIDTH // 2 - 80, HEIGHT // 2, GREEN)
+            pygame.display.flip()
+            pygame.time.delay(2000)
+
+    pygame.quit()
+
+# Iniciar el juego
+game_loop()
