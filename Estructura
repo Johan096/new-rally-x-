@@ -1,0 +1,188 @@
+import pygame
+import random
+
+# Inicialización de Pygame
+pygame.init()
+
+# Configuración de pantalla
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("New Rally X")
+
+# Colores
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
+YELLOW = (255, 255, 0)
+
+# Fuente
+font = pygame.font.Font(None, 36)
+
+def draw_text(text, x, y, color=BLACK):
+    render = font.render(text, True, color)
+    screen.blit(render, (x, y))
+
+# Clase Bullet
+class Bullet:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.speed = 6
+        self.rect = pygame.Rect(self.x, self.y, 10, 10)
+    
+    def move(self):
+        self.x += self.speed
+        self.rect.topleft = (self.x, self.y)
+    
+    def draw(self):
+        pygame.draw.rect(screen, YELLOW, self.rect)
+
+# Clase Player
+class Player:
+    def __init__(self):
+        self.x = 100
+        self.y = 100
+        self.speed = 4
+        self.rect = pygame.Rect(self.x, self.y, 40, 40)
+        self.defending = False
+    
+    def move(self, keys):
+        if keys[pygame.K_LEFT]:
+            self.x -= self.speed
+        if keys[pygame.K_RIGHT]:
+            self.x += self.speed
+        if keys[pygame.K_UP]:
+            self.y -= self.speed
+        if keys[pygame.K_DOWN]:
+            self.y += self.speed
+        self.rect.topleft = (self.x, self.y)
+    
+    def draw(self):
+        color = GREEN if self.defending else RED
+        pygame.draw.rect(screen, color, self.rect)
+    
+    def defend(self, keys):
+        self.defending = keys[pygame.K_SPACE]
+    
+    def shoot(self, bullets):
+        bullets.append(Bullet(self.x + 40, self.y + 15))
+
+# Clase Enemy con Árbol de Comportamiento
+class Enemy:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.speed = 2
+        self.rect = pygame.Rect(self.x, self.y, 40, 40)
+    
+    def move_towards(self, target):
+        if self.x < target.x:
+            self.x += self.speed
+        if self.x > target.x:
+            self.x -= self.speed
+        if self.y < target.y:
+            self.y += self.speed
+        if self.y > target.y:
+            self.y -= self.speed
+        self.rect.topleft = (self.x, self.y)
+    
+    def attack(self, target):
+        if self.rect.colliderect(target.rect) and not target.defending:
+            return True
+        return False
+    
+    def draw(self):
+        pygame.draw.rect(screen, BLUE, self.rect)
+
+def main_menu():
+    menu_running = True
+    while menu_running:
+        screen.fill(WHITE)
+        draw_text("1. Empezar Juego", 300, 200)
+        draw_text("2. Pausar Juego", 300, 250)
+        draw_text("3. Salir", 300, 300)
+        pygame.display.flip()
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    return "start"
+                if event.key == pygame.K_2:
+                    return "pause"
+                if event.key == pygame.K_3:
+                    pygame.quit()
+                    exit()
+
+# Bucle del juego
+ticking = True
+clock = pygame.time.Clock()
+while ticking:
+    state = main_menu()
+    paused = False
+    game_over = False
+    win = False
+    player = Player()
+    enemies = [Enemy(random.randint(200, 700), random.randint(200, 500)) for _ in range(3)]
+    bullets = []
+    
+    while state == "start" and not game_over and not win:
+        screen.fill(WHITE)
+        keys = pygame.key.get_pressed()
+        player.move(keys)
+        player.defend(keys)
+        player.draw()
+        
+        if keys[pygame.K_SPACE]:
+            player.shoot(bullets)
+        
+        for bullet in bullets[:]:
+            bullet.move()
+            bullet.draw()
+            if bullet.x > WIDTH:
+                bullets.remove(bullet)
+        
+        for enemy in enemies[:]:
+            enemy.move_towards(player)
+            enemy.draw()
+            if enemy.attack(player):
+                game_over = True
+            
+            for bullet in bullets[:]:
+                if bullet.rect.colliderect(enemy.rect):
+                    enemies.remove(enemy)
+                    bullets.remove(bullet)
+                    break
+        
+        if not enemies:
+            win = True
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                ticking = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_2:
+                    paused = not paused
+                if event.key == pygame.K_3:
+                    ticking = False
+        
+        pygame.display.flip()
+        clock.tick(30)
+    
+    if game_over:
+        screen.fill(WHITE)
+        draw_text("GAME OVER", WIDTH // 2 - 80, HEIGHT // 2, RED)
+        pygame.display.flip()
+        pygame.time.delay(2000)
+    
+    if win:
+        screen.fill(WHITE)
+        draw_text("YOU WIN!", WIDTH // 2 - 80, HEIGHT // 2, GREEN)
+        pygame.display.flip()
+        pygame.time.delay(2000)
+
+pygame.quit()
