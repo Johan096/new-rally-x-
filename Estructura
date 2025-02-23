@@ -16,6 +16,7 @@ BLUE = (0, 0, 255)
 BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
+BROWN = (139, 69, 19)  # Color para los obstáculos
 
 # Fuente
 font = pygame.font.Font(None, 36)
@@ -67,7 +68,9 @@ class Player:
         self.bullets = []  # Lista de balas
         self.can_shoot = True  # Para evitar disparos continuos
 
-    def move(self, keys):
+    def move(self, keys, obstacles):
+        original_x, original_y = self.x, self.y
+
         if keys[pygame.K_LEFT]:
             self.x -= self.speed
             self.angle = 180  # Mira hacia la izquierda
@@ -80,12 +83,20 @@ class Player:
         if keys[pygame.K_DOWN]:
             self.y += self.speed
             self.angle = 90  # Mira hacia abajo
+
         self.rect.topleft = (self.x, self.y)
+
+        # Verificar colisiones con los obstáculos
+        for obstacle in obstacles:
+            if self.rect.colliderect(obstacle):
+                self.x, self.y = original_x, original_y  # Restaurar posición si hay colisión
+                self.rect.topleft = (self.x, self.y)
+                break
 
     def draw(self):
         # Rotamos la imagen según el ángulo
         rotated_image = pygame.transform.rotate(self.image, self.angle)
-        rotated_rect = rotated_image.get_rect(center=self.rect.center)  # Ajustamos el rectángulo de la imagen para que se dibuje correctamente
+        rotated_rect = rotated_image.get_rect(center=self.rect.center)  # Ajustamos el rectángulo de la imagen para que se dibujue correctamente
         screen.blit(rotated_image, rotated_rect.topleft)  # Dibujamos la imagen rotada
 
         # Dibujar las balas
@@ -104,10 +115,22 @@ class Enemy:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.speed = 2
-        self.rect = pygame.Rect(self.x, self.y, 40, 40)
-    
-    def move_towards(self, target):
+        self.speed = 1  # Cambié la velocidad a 1 para que se muevan más lentamente
+        self.rect = pygame.Rect(self.x, self.y, 70, 70)
+        
+        # Cargar la imagen del enemigo
+        try:
+            self.image = pygame.image.load("enemigos.png")  # Usamos 'enemigos.png'
+            self.image = pygame.transform.scale(self.image, (70, 70))  # Escalamos la imagen si es necesario
+        except pygame.error:
+            print("No se pudo cargar la imagen 'enemigos.png'. Usando un color de fondo.")
+            self.image = pygame.Surface((70, 70))  # Superficie de reemplazo en caso de error
+            self.image.fill(BLUE)
+
+    def move_towards(self, target, obstacles):
+        original_x, original_y = self.x, self.y
+
+        # Mover hacia la posición del jugador
         if self.x < target.x:
             self.x += self.speed
         if self.x > target.x:
@@ -116,15 +139,32 @@ class Enemy:
             self.y += self.speed
         if self.y > target.y:
             self.y -= self.speed
+
         self.rect.topleft = (self.x, self.y)
-    
+
+        # Verificar colisiones con los obstáculos y cambiar dirección si colide
+        for obstacle in obstacles:
+            if self.rect.colliderect(obstacle):
+                # Si colide con un obstáculo, cambiar la dirección pero seguir persiguiendo al jugador
+                if self.x < target.x:
+                    self.x -= self.speed  # Mover hacia atrás
+                if self.x > target.x:
+                    self.x += self.speed  # Mover hacia atrás
+                if self.y < target.y:
+                    self.y -= self.speed  # Mover hacia atrás
+                if self.y > target.y:
+                    self.y += self.speed  # Mover hacia atrás
+                
+                self.rect.topleft = (self.x, self.y)  # Actualizar la posición después de evitar el obstáculo
+
     def attack(self, target):
         if self.rect.colliderect(target.rect) and not target.defending:
             return True
         return False
-    
+
     def draw(self):
-        pygame.draw.rect(screen, BLUE, self.rect)
+        # Dibuja la imagen del enemigo
+        screen.blit(self.image, self.rect.topleft)
 
 def main_menu():
     menu_running = True
@@ -151,18 +191,34 @@ def main_menu():
 def game_loop():
     ticking = True
     clock = pygame.time.Clock()
+    
+    # Definir la meta (meta de destino)
+    goal_rect = pygame.Rect(WIDTH - 100, HEIGHT - 100, 50, 50)  # Rectángulo de la meta en la esquina inferior derecha
+    
+    # Definir los obstáculos
+    obstacles = [
+        pygame.Rect(300, 200, 100, 20),
+        pygame.Rect(500, 400, 150, 20),
+        pygame.Rect(200, 450, 50, 50),
+        pygame.Rect(600, 100, 50, 200),
+        pygame.Rect(100, 150, 200, 20),  # Obstáculo adicional
+        pygame.Rect(400, 250, 150, 20)   # Obstáculo adicional
+    ]
+    
     while ticking:
         state = main_menu()
         paused = False
         game_over = False
         win = False
         player = Player()
-        enemies = [Enemy(random.randint(200, 700), random.randint(200, 500)) for _ in range(3)]
+        
+        # Colocar enemigos en diferentes posiciones aleatorias
+        enemies = [Enemy(random.randint(100, 700), random.randint(100, 500)) for _ in range(3)]
         
         while state == "start" and not game_over and not win:
             screen.fill(WHITE)
             keys = pygame.key.get_pressed()
-            player.move(keys)
+            player.move(keys, obstacles)
             
             # Si se presiona la tecla de espacio, disparar
             if keys[pygame.K_SPACE]:
@@ -171,7 +227,7 @@ def game_loop():
             player.draw()
 
             for enemy in enemies[:]:
-                enemy.move_towards(player)
+                enemy.move_towards(player, obstacles)  # Enemigos que sortean obstáculos y siguen al jugador
                 enemy.draw()
                 if enemy.attack(player):
                     game_over = True
@@ -182,9 +238,17 @@ def game_loop():
                         player.bullets.remove(bullet)
                         break
             
-            if not enemies:
+            # Comprobar si el jugador llega a la meta
+            if player.rect.colliderect(goal_rect):
                 win = True
             
+            # Dibujar la meta
+            pygame.draw.rect(screen, GREEN, goal_rect)  # Dibujar la meta en la pantalla
+
+            # Dibujar obstáculos
+            for obstacle in obstacles:
+                pygame.draw.rect(screen, BROWN, obstacle)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     ticking = False
