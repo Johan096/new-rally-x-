@@ -65,6 +65,7 @@ class Player:
             self.image.fill(RED)
         self.angle = 0  # Ángulo de rotación inicial
         self.bullets = []  # Lista de balas
+        self.can_shoot = True  # Para evitar disparos continuos
 
     def move(self, keys):
         if keys[pygame.K_LEFT]:
@@ -81,9 +82,6 @@ class Player:
             self.angle = 90  # Mira hacia abajo
         self.rect.topleft = (self.x, self.y)
 
-        # Disparar automáticamente mientras se mueve
-        self.shoot()
-
     def draw(self):
         # Rotamos la imagen según el ángulo
         rotated_image = pygame.transform.rotate(self.image, self.angle)
@@ -97,13 +95,9 @@ class Player:
             if bullet.x > WIDTH or bullet.x < 0 or bullet.y < 0 or bullet.y > HEIGHT:
                 self.bullets.remove(bullet)
 
-    def defend(self, keys):
-        self.defending = keys[pygame.K_SPACE]
-    
     def shoot(self):
-        # Solo disparar si el jugador se mueve
-        if len(self.bullets) < 5:  # Limitar el número de balas
-            self.bullets.append(Bullet(self.x + 40, self.y + 15, self.angle))  # Crear la bala según la dirección del jugador
+        # Solo disparar cuando el jugador presiona la tecla de espacio
+        self.bullets.append(Bullet(self.x + 40, self.y + 15, self.angle))  # Crear la bala según la dirección del jugador
 
 # Clase Enemy con Árbol de Comportamiento
 class Enemy:
@@ -169,7 +163,11 @@ def game_loop():
             screen.fill(WHITE)
             keys = pygame.key.get_pressed()
             player.move(keys)
-            player.defend(keys)
+            
+            # Si se presiona la tecla de espacio, disparar
+            if keys[pygame.K_SPACE]:
+                player.shoot()
+
             player.draw()
 
             for enemy in enemies[:]:
