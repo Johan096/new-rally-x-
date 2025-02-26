@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 
 # Inicialización de Pygame
 pygame.init()
@@ -17,6 +18,7 @@ BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
 BROWN = (139, 69, 19)  # Color para los obstáculos
+BORDER_COLOR = (0, 0, 0)  # Color del borde
 
 # Fuente
 font = pygame.font.Font(None, 36)
@@ -58,7 +60,7 @@ class Player:
         self.defending = False
         # Cargar la imagen del jugador
         try:
-            self.image = pygame.image.load("player1.jpg")  # Cambié el nombre de 'player.jpg' a 'player1.jpg'
+            self.image = pygame.image.load("player1.jpg") 
             self.image = pygame.transform.scale(self.image, (40, 40))  # Escalar la imagen
         except pygame.error:
             print("No se pudo cargar la imagen 'player1.jpg'. Usando un color de fondo.")
@@ -110,13 +112,14 @@ class Player:
         # Solo disparar cuando el jugador presiona la tecla de espacio
         self.bullets.append(Bullet(self.x + 40, self.y + 15, self.angle))  # Crear la bala según la dirección del jugador
 
-# Clase Enemy con Árbol de Comportamiento
+# Clase Enemy con persecución activa
 class Enemy:
-    def __init__(self, x, y):
+    def __init__(self, x, y, detection_range=200):  # Añadido parámetro de rango de detección
         self.x = x
         self.y = y
-        self.speed = 1  # Cambié la velocidad a 1 para que se muevan más lentamente
+        self.speed = 3  # Aumenté la velocidad a 3
         self.rect = pygame.Rect(self.x, self.y, 70, 70)
+        self.detection_range = detection_range  # Rango de detección del enemigo
         
         # Cargar la imagen del enemigo
         try:
@@ -128,34 +131,30 @@ class Enemy:
             self.image.fill(BLUE)
 
     def move_towards(self, target, obstacles):
-        original_x, original_y = self.x, self.y
+        # Calcular la distancia y comprobar si está dentro del rango de detección
+        dx = target.x - self.x
+        dy = target.y - self.y
+        distance = math.sqrt(dx**2 + dy**2)
+        
+        if distance <= self.detection_range:  # Si el jugador está dentro del rango de detección
+            # Normalizar la dirección
+            if distance != 0:
+                dx /= distance
+                dy /= distance
 
-        # Mover hacia la posición del jugador
-        if self.x < target.x:
-            self.x += self.speed
-        if self.x > target.x:
-            self.x -= self.speed
-        if self.y < target.y:
-            self.y += self.speed
-        if self.y > target.y:
-            self.y -= self.speed
+            # Moverse hacia el jugador
+            self.x += dx * self.speed
+            self.y += dy * self.speed
 
-        self.rect.topleft = (self.x, self.y)
+            self.rect.topleft = (self.x, self.y)
 
-        # Verificar colisiones con los obstáculos y cambiar dirección si colide
-        for obstacle in obstacles:
-            if self.rect.colliderect(obstacle):
-                # Si colide con un obstáculo, cambiar la dirección pero seguir persiguiendo al jugador
-                if self.x < target.x:
-                    self.x -= self.speed  # Mover hacia atrás
-                if self.x > target.x:
-                    self.x += self.speed  # Mover hacia atrás
-                if self.y < target.y:
-                    self.y -= self.speed  # Mover hacia atrás
-                if self.y > target.y:
-                    self.y += self.speed  # Mover hacia atrás
-                
-                self.rect.topleft = (self.x, self.y)  # Actualizar la posición después de evitar el obstáculo
+            # Verificar colisiones con los obstáculos y cambiar dirección si colide
+            for obstacle in obstacles:
+                if self.rect.colliderect(obstacle):
+                    # Si colide con un obstáculo, moverse en dirección opuesta
+                    self.x -= dx * self.speed
+                    self.y -= dy * self.speed
+                    self.rect.topleft = (self.x, self.y)  # Restaurar posición si hay colisión
 
     def attack(self, target):
         if self.rect.colliderect(target.rect) and not target.defending:
@@ -171,7 +170,7 @@ def main_menu():
     while menu_running:
         screen.fill(WHITE)
         draw_text("1. Empezar Juego", 300, 200)
-        draw_text("2. Pausar Juego", 300, 250)
+        draw_text("2. Sonido", 300, 250)
         draw_text("3. Salir", 300, 300)
         pygame.display.flip()
         
@@ -195,14 +194,21 @@ def game_loop():
     # Definir la meta (meta de destino)
     goal_rect = pygame.Rect(WIDTH - 100, HEIGHT - 100, 50, 50)  # Rectángulo de la meta en la esquina inferior derecha
     
-    # Definir los obstáculos
+    # Definir los obstáculos como parte de la pista
     obstacles = [
-        pygame.Rect(300, 200, 100, 20),
-        pygame.Rect(500, 400, 150, 20),
-        pygame.Rect(200, 450, 50, 50),
-        pygame.Rect(600, 100, 50, 200),
-        pygame.Rect(100, 150, 200, 20),  # Obstáculo adicional
-        pygame.Rect(400, 250, 150, 20)   # Obstáculo adicional
+        pygame.Rect(200, 150, 400, 20),  # Parte superior de la pista
+        pygame.Rect(200, 400, 400, 20),  # Parte inferior de la pista
+        pygame.Rect(100, 150, 20, 250),  # Pared izquierda
+        pygame.Rect(700, 150, 20, 250),  # Pared derecha
+        pygame.Rect(300, 250, 200, 20),  # Parte central de la pista
+    ]
+    
+    # Borde alrededor de la pista
+    border_rects = [
+        pygame.Rect(0, 0, WIDTH, 20),  # Parte superior
+        pygame.Rect(0, HEIGHT - 20, WIDTH, 20),  # Parte inferior
+        pygame.Rect(0, 0, 20, HEIGHT),  # Parte izquierda
+        pygame.Rect(WIDTH - 20, 0, 20, HEIGHT)  # Parte derecha
     ]
     
     while ticking:
@@ -212,8 +218,13 @@ def game_loop():
         win = False
         player = Player()
         
-        # Colocar enemigos en diferentes posiciones aleatorias
-        enemies = [Enemy(random.randint(100, 700), random.randint(100, 500)) for _ in range(3)]
+        # Colocar enemigos en diferentes posiciones dentro de la pista
+        enemies = [
+            Enemy(250, 100),  # Enemigo dentro de la pista
+            Enemy(550, 200),  # Otro enemigo dentro de la pista
+            Enemy(350, 420),  # Otro enemigo dentro de la pista
+            Enemy(400, 300),  # Nuevo enemigo añadido
+        ]
         
         while state == "start" and not game_over and not win:
             screen.fill(WHITE)
@@ -226,8 +237,9 @@ def game_loop():
 
             player.draw()
 
+            # Mover enemigos hacia el jugador y atacar si es posible
             for enemy in enemies[:]:
-                enemy.move_towards(player, obstacles)  # Enemigos que sortean obstáculos y siguen al jugador
+                enemy.move_towards(player, obstacles)  # Los enemigos siguen al jugador
                 enemy.draw()
                 if enemy.attack(player):
                     game_over = True
@@ -243,11 +255,15 @@ def game_loop():
                 win = True
             
             # Dibujar la meta
-            pygame.draw.rect(screen, GREEN, goal_rect)  # Dibujar la meta en la pantalla
+            pygame.draw.rect(screen, GREEN, goal_rect)  
 
-            # Dibujar obstáculos
+            # Dibujar obstáculos (las paredes de la pista)
             for obstacle in obstacles:
                 pygame.draw.rect(screen, BROWN, obstacle)
+
+            # Dibujar borde de la pista
+            for border in border_rects:
+                pygame.draw.rect(screen, BORDER_COLOR, border)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
