@@ -17,8 +17,6 @@ BLUE = (0, 0, 255)
 BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
-BROWN = (139, 69, 19)  # Color para los obstáculos
-BORDER_COLOR = (0, 0, 0)  # Color del borde
 
 # Fuente
 font = pygame.font.Font(None, 36)
@@ -39,11 +37,11 @@ class Bullet:
     def move(self):
         if self.angle == 0:  # Mueve a la derecha
             self.x += self.speed
-        elif self.angle == 180:  # Mueve a la izquierda
+        elif self.angle == 280:  # Mueve a la izquierda
             self.x -= self.speed
         elif self.angle == 270:  # Mueve hacia arriba
             self.y -= self.speed
-        elif self.angle == 90:  # Mueve hacia abajo
+        elif self.angle == 190:  # Mueve hacia abajo
             self.y += self.speed
         self.rect.topleft = (self.x, self.y)
     
@@ -60,17 +58,19 @@ class Player:
         self.defending = False
         # Cargar la imagen del jugador
         try:
-            self.image = pygame.image.load("player1.jpg") 
-            self.image = pygame.transform.scale(self.image, (40, 40))  # Escalar la imagen
+            self.image = pygame.image.load("player01_.png") 
+            self.image = pygame.transform.scale(self.image, (55, 55))  # Escalar la imagen
         except pygame.error:
-            print("No se pudo cargar la imagen 'player1.jpg'. Usando un color de fondo.")
-            self.image = pygame.Surface((40, 40))  # Superficie de reemplazo
+            print("No se pudo cargar la imagen 'player01_.png'. Usando un color de fondo.")
+            self.image = pygame.Surface((55, 55))  # Superficie de reemplazo
             self.image.fill(RED)
         self.angle = 0  # Ángulo de rotación inicial
         self.bullets = []  # Lista de balas
         self.can_shoot = True  # Para evitar disparos continuos
+        self.coins_collected = 0  # Monedas recogidas
+        self.health = 100  # Salud inicial
 
-    def move(self, keys, obstacles):
+    def move(self, keys):
         original_x, original_y = self.x, self.y
 
         if keys[pygame.K_LEFT]:
@@ -81,19 +81,22 @@ class Player:
             self.angle = 0  # Mira hacia la derecha
         if keys[pygame.K_UP]:
             self.y -= self.speed
-            self.angle = 270  # Mira hacia arriba
+            self.angle = 70  # Mira hacia arriba
         if keys[pygame.K_DOWN]:
             self.y += self.speed
             self.angle = 90  # Mira hacia abajo
 
-        self.rect.topleft = (self.x, self.y)
+        # Restricciones para no salir de la pantalla
+        if self.x < 0:  # No puede pasar de la izquierda
+            self.x = 0
+        if self.x + self.rect.width > WIDTH:  # No puede pasar de la derecha
+            self.x = WIDTH - self.rect.width
+        if self.y < 0:  # No puede pasar de arriba
+            self.y = 0
+        if self.y + self.rect.height > HEIGHT:  # No puede pasar de abajo
+            self.y = HEIGHT - self.rect.height
 
-        # Verificar colisiones con los obstáculos
-        for obstacle in obstacles:
-            if self.rect.colliderect(obstacle):
-                self.x, self.y = original_x, original_y  # Restaurar posición si hay colisión
-                self.rect.topleft = (self.x, self.y)
-                break
+        self.rect.topleft = (self.x, self.y)
 
     def draw(self):
         # Rotamos la imagen según el ángulo
@@ -108,70 +111,127 @@ class Player:
             if bullet.x > WIDTH or bullet.x < 0 or bullet.y < 0 or bullet.y > HEIGHT:
                 self.bullets.remove(bullet)
 
+        # Mostrar las monedas recogidas
+        draw_text(f"Monedas: {self.coins_collected}", 10, 10, RED)
+
+        # Mostrar la salud del jugador
+        draw_text(f"Salud: {self.health}", WIDTH - 150, 10, RED)
+
     def shoot(self):
         # Solo disparar cuando el jugador presiona la tecla de espacio
         self.bullets.append(Bullet(self.x + 40, self.y + 15, self.angle))  # Crear la bala según la dirección del jugador
 
-# Clase Enemy con persecución activa
-class Enemy:
-    def __init__(self, x, y, detection_range=200):  # Añadido parámetro de rango de detección
+# Clase Coin (Moneda)
+class Coin:
+    def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.speed = 3  # Aumenté la velocidad a 3
-        self.rect = pygame.Rect(self.x, self.y, 70, 70)
-        self.detection_range = detection_range  # Rango de detección del enemigo
-        
-        # Cargar la imagen del enemigo
+        self.rect = pygame.Rect(self.x, self.y, 20, 20)
+    
+    def draw(self):
+        pygame.draw.circle(screen, YELLOW, (self.x + 10, self.y + 10), 10)  # Dibujar la moneda como un círculo
+
+# Clase Enemy (Enemigo)
+class Enemy:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.speed = 2
+        self.rect = pygame.Rect(self.x, self.y, 50, 50)
+        self.direction = random.choice([0, 90, 180, 270])  # Dirección aleatoria (0: derecha, 90: abajo, 180: izquierda, 270: arriba)
+        self.patrol_points = [(self.x, self.y), (random.randint(200, WIDTH - 200), random.randint(200, HEIGHT - 200))]
+        self.current_patrol_point = 0  # Usamos un punto de patrullaje
+
         try:
-            self.image = pygame.image.load("enemigos.png")  # Usamos 'enemigos.png'
-            self.image = pygame.transform.scale(self.image, (70, 70))  # Escalamos la imagen si es necesario
+            self.image = pygame.image.load("enemigos01.png")  # Cargar la imagen de los enemigos
+            self.image = pygame.transform.scale(self.image, (50, 50))  # Escalar la imagen
         except pygame.error:
-            print("No se pudo cargar la imagen 'enemigos.png'. Usando un color de fondo.")
-            self.image = pygame.Surface((70, 70))  # Superficie de reemplazo en caso de error
-            self.image.fill(BLUE)
+            print("No se pudo cargar la imagen 'enemigos01.png'. Usando un color de fondo.")
+            self.image = pygame.Surface((50, 50))  # Superficie de reemplazo
 
-    def move_towards(self, target, obstacles):
-        # Calcular la distancia y comprobar si está dentro del rango de detección
-        dx = target.x - self.x
-        dy = target.y - self.y
+    def patrol(self):
+        # Patrullar entre puntos
+        target_x, target_y = self.patrol_points[self.current_patrol_point]
+        dx = target_x - self.x
+        dy = target_y - self.y
         distance = math.sqrt(dx**2 + dy**2)
-        
-        if distance <= self.detection_range:  # Si el jugador está dentro del rango de detección
-            # Normalizar la dirección
+
+        if distance < 3:  # Si llegó al punto de patrullaje
+            self.current_patrol_point = (self.current_patrol_point + 1) % len(self.patrol_points)  # Cambia al siguiente punto
+
+        if distance != 0:
+            dx, dy = dx / distance, dy / distance  # Normalizamos el movimiento
+
+        self.x += self.speed * dx
+        self.y += self.speed * dy
+        self.rect.topleft = (self.x, self.y)
+
+    def move(self, player):
+        # Si el jugador está cerca, mover al enemigo hacia el jugador
+        dx = player.x - self.x
+        dy = player.y - self.y
+        distance = math.sqrt(dx**2 + dy**2)
+
+        if distance < 200:  # Si el jugador está dentro del rango de 200 píxeles
             if distance != 0:
-                dx /= distance
-                dy /= distance
+                dx, dy = dx / distance, dy / distance  # Normalizamos el movimiento
 
-            # Moverse hacia el jugador
-            self.x += dx * self.speed
-            self.y += dy * self.speed
+            # Actualizar la posición del enemigo
+            self.x += self.speed * dx
+            self.y += self.speed * dy
+        else:
+            self.patrol()  # Si no está cerca, patrullará
 
-            self.rect.topleft = (self.x, self.y)
-
-            # Verificar colisiones con los obstáculos y cambiar dirección si colide
-            for obstacle in obstacles:
-                if self.rect.colliderect(obstacle):
-                    # Si colide con un obstáculo, moverse en dirección opuesta
-                    self.x -= dx * self.speed
-                    self.y -= dy * self.speed
-                    self.rect.topleft = (self.x, self.y)  # Restaurar posición si hay colisión
-
-    def attack(self, target):
-        if self.rect.colliderect(target.rect) and not target.defending:
-            return True
-        return False
+        # Limitar el movimiento de los enemigos para que no salgan de la pantalla
+        if self.x < 0: self.x = 0
+        if self.x + self.rect.width > WIDTH: self.x = WIDTH - self.rect.width
+        if self.y < 0: self.y = 0
+        if self.y + self.rect.height > HEIGHT: self.y = HEIGHT - self.rect.height
+        
+        self.rect.topleft = (self.x, self.y)
 
     def draw(self):
-        # Dibuja la imagen del enemigo
+        # Dibujar el enemigo con la imagen cargada
         screen.blit(self.image, self.rect.topleft)
 
-def main_menu():
+    def attack(self, player):
+        # Si el enemigo está cerca del jugador, el enemigo lo atacará
+        if self.rect.colliderect(player.rect):
+            player.health -= 1  # Reducir la salud del jugador cuando el enemigo lo toque
+
+    def hit_by_bullet(self, bullets):
+        # Si una bala toca al enemigo, el enemigo muere
+        for bullet in bullets:
+            if self.rect.colliderect(bullet.rect):
+                return True
+        return False
+
+# Función para mostrar el menú con fondo
+def main_menu(sound_enabled):
     menu_running = True
+    menu_options = ["Empezar Juego", f"Sonido: {'ON' if sound_enabled else 'OFF'}", "Salir"]
+    selected_option = 0  # Índice de la opción seleccionada
+    
+    # Intentamos cargar la imagen del fondo
+    try:
+        background = pygame.image.load("fondo_menu.jpg")
+        background = pygame.transform.scale(background, (WIDTH, HEIGHT))  # Escalamos la imagen al tamaño de la pantalla
+    except pygame.error:
+        print("No se pudo cargar la imagen 'fondo_menu.jpg'. Usando color de fondo.")
+        background = pygame.Surface((WIDTH, HEIGHT))  # Superficie de reemplazo en caso de error
+        background.fill(WHITE)
+
     while menu_running:
-        screen.fill(WHITE)
-        draw_text("1. Empezar Juego", 300, 200)
-        draw_text("2. Sonido", 300, 250)
-        draw_text("3. Salir", 300, 300)
+        screen.blit(background, (0, 0))  # Dibujamos el fondo
+
+        # Dibujar las opciones del menú
+        for i, option in enumerate(menu_options):
+            # Sombrear la opción seleccionada
+            if i == selected_option:
+                draw_text(option, 300, 200 + i * 50, color=RED)  # Sombra con rojo
+            else:
+                draw_text(option, 300, 200 + i * 50)
+
         pygame.display.flip()
         
         for event in pygame.event.get():
@@ -179,57 +239,70 @@ def main_menu():
                 pygame.quit()
                 exit()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_1:
-                    return "start"
-                if event.key == pygame.K_2:
-                    return "pause"
-                if event.key == pygame.K_3:
-                    pygame.quit()
-                    exit()
+                if event.key == pygame.K_UP:  # Tecla de subir
+                    selected_option = (selected_option - 1) % len(menu_options)
+                if event.key == pygame.K_DOWN:  # Tecla de bajar
+                    selected_option = (selected_option + 1) % len(menu_options)
+                if event.key == pygame.K_RETURN:  # Tecla Enter para seleccionar
+                    if selected_option == 0:
+                        return "start", sound_enabled
+                    elif selected_option == 1:
+                        sound_enabled = not sound_enabled  # Alternar estado del sonido
+                        return "pause", sound_enabled
+                    elif selected_option == 2:
+                        pygame.quit()
+                        exit()
 
 def game_loop():
     ticking = True
     clock = pygame.time.Clock()
     
+    # Cargar la imagen de fondo
+    try:
+        background = pygame.image.load("background.jpg")
+        background = pygame.transform.scale(background, (WIDTH, HEIGHT))  # Escalamos la imagen al tamaño de la pantalla
+    except pygame.error:
+        print("No se pudo cargar la imagen 'background1.jpg'. Usando color de fondo.")
+        background = pygame.Surface((WIDTH, HEIGHT))  # Superficie de reemplazo en caso de error
+        background.fill(WHITE)
+
     # Definir la meta (meta de destino)
     goal_rect = pygame.Rect(WIDTH - 100, HEIGHT - 100, 50, 50)  # Rectángulo de la meta en la esquina inferior derecha
     
-    # Definir los obstáculos como parte de la pista
-    obstacles = [
-        pygame.Rect(200, 150, 400, 20),  # Parte superior de la pista
-        pygame.Rect(200, 400, 400, 20),  # Parte inferior de la pista
-        pygame.Rect(100, 150, 20, 250),  # Pared izquierda
-        pygame.Rect(700, 150, 20, 250),  # Pared derecha
-        pygame.Rect(300, 250, 200, 20),  # Parte central de la pista
+    # Crear las monedas en diferentes posiciones
+    coins = [
+        Coin(150, 200), 
+        Coin(350, 300), 
+        Coin(600, 250),
+        Coin(500, 100),
+        Coin(200, 500)
     ]
     
-    # Borde alrededor de la pista
-    border_rects = [
-        pygame.Rect(0, 0, WIDTH, 20),  # Parte superior
-        pygame.Rect(0, HEIGHT - 20, WIDTH, 20),  # Parte inferior
-        pygame.Rect(0, 0, 20, HEIGHT),  # Parte izquierda
-        pygame.Rect(WIDTH - 20, 0, 20, HEIGHT)  # Parte derecha
-    ]
+    # Crear enemigos en posiciones alejadas del jugador
+    enemies = []
+    for _ in range(5):
+        # Evitamos que los enemigos aparezcan cerca del jugador
+        while True:
+            x = random.randint(200, WIDTH - 200)  # Aseguramos que estén alejados de las áreas cercanas al jugador
+            y = random.randint(200, HEIGHT - 200)
+            if abs(x - 100) > 100 and abs(y - 100) > 100:  # Aseguramos que estén lejos del jugador
+                enemies.append(Enemy(x, y))
+                break
+    
+    sound_enabled = True  # Estado del sonido
     
     while ticking:
-        state = main_menu()
+        state, sound_enabled = main_menu(sound_enabled)  # Regresa al menú después de cada partida
         paused = False
         game_over = False
         win = False
         player = Player()
         
-        # Colocar enemigos en diferentes posiciones dentro de la pista
-        enemies = [
-            Enemy(250, 100),  # Enemigo dentro de la pista
-            Enemy(550, 200),  # Otro enemigo dentro de la pista
-            Enemy(350, 420),  # Otro enemigo dentro de la pista
-            Enemy(400, 300),  # Nuevo enemigo añadido
-        ]
-        
         while state == "start" and not game_over and not win:
-            screen.fill(WHITE)
+            screen.blit(background, (0, 0))  # Dibujar el fondo con la imagen
+
             keys = pygame.key.get_pressed()
-            player.move(keys, obstacles)
+            player.move(keys)
             
             # Si se presiona la tecla de espacio, disparar
             if keys[pygame.K_SPACE]:
@@ -237,33 +310,33 @@ def game_loop():
 
             player.draw()
 
-            # Mover enemigos hacia el jugador y atacar si es posible
-            for enemy in enemies[:]:
-                enemy.move_towards(player, obstacles)  # Los enemigos siguen al jugador
-                enemy.draw()
-                if enemy.attack(player):
-                    game_over = True
-                
-                for bullet in player.bullets[:]:
-                    if bullet.rect.colliderect(enemy.rect):
-                        enemies.remove(enemy)
-                        player.bullets.remove(bullet)
-                        break
-            
             # Comprobar si el jugador llega a la meta
             if player.rect.colliderect(goal_rect):
                 win = True
-            
+
             # Dibujar la meta
-            pygame.draw.rect(screen, GREEN, goal_rect)  
+            pygame.draw.rect(screen, GREEN, goal_rect)
 
-            # Dibujar obstáculos (las paredes de la pista)
-            for obstacle in obstacles:
-                pygame.draw.rect(screen, BROWN, obstacle)
+            # Dibujar monedas y verificar colisiones con el jugador
+            for coin in coins[:]:
+                coin.draw()
+                if player.rect.colliderect(coin.rect):
+                    player.coins_collected += 1  # Incrementar las monedas recogidas
+                    coins.remove(coin)  # Eliminar la moneda recogida
 
-            # Dibujar borde de la pista
-            for border in border_rects:
-                pygame.draw.rect(screen, BORDER_COLOR, border)
+            # Mover y dibujar enemigos
+            for enemy in enemies[:]:
+                enemy.move(player)
+                enemy.draw()
+                enemy.attack(player)  # Los enemigos atacan al jugador
+                if enemy.hit_by_bullet(player.bullets):  # Verificar si el enemigo fue golpeado por una bala
+                    enemies.remove(enemy)  # Eliminar el enemigo
+
+            # Verificar si el jugador es tocado por algún enemigo
+            for enemy in enemies:
+                if player.rect.colliderect(enemy.rect):
+                    game_over = True
+                    break
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -297,11 +370,10 @@ def game_loop():
         
         if win:
             screen.fill(WHITE)
-            draw_text("YOU WIN!", WIDTH // 2 - 80, HEIGHT // 2, GREEN)
+            draw_text(f"YOU WIN! Monedas: {player.coins_collected}", WIDTH // 2 - 100, HEIGHT // 2, GREEN)
             pygame.display.flip()
             pygame.time.delay(2000)
 
-    pygame.quit()
-
 # Iniciar el juego
 game_loop()
+pygame.quit()
