@@ -1,2 +1,10 @@
+#Primer parcial
 # new-rally-x-
-primer parcial, crear un video juego inspirado en el de new rally x
+Johan Daniel Muñoz salas
+
+
+22-sisn-2-041
+
+
+
+Crear un videojuego inspirado en el famoso juego "new rally x".
