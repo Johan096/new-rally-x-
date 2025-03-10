@@ -44,35 +44,69 @@ def draw_text(text, x, y, color=BLACK):
     screen.blit(render, (x, y))
 
 # =============================================================================
-# FUNCIONES DE TRANSICIÓN (FADE IN / FADE OUT)
+# TRANSICIONES NO BLOQUEANTES: Clase para Fade In / Fade Out
 # =============================================================================
-def fade_in(screen, color=(0, 0, 0), speed=5):
-    fade = pygame.Surface((WIDTH, HEIGHT))
-    fade.fill(color)
-    for alpha in range(255, -1, -speed):
-        fade.set_alpha(alpha)
-        screen.blit(fade, (0, 0))
-        pygame.display.update()
-        pygame.time.delay(10)
+class FadeTransition:
+    def __init__(self, screen, direction="in", color=(0, 0, 0), duration=500):
+        """
+        :param screen: Superficie sobre la que se dibuja el fade.
+        :param direction: "in" para fade in (de opaco a transparente) o "out" para fade out.
+        :param color: Color de la transición.
+        :param duration: Duración de la transición en milisegundos.
+        """
+        self.screen = screen
+        self.direction = direction
+        self.color = color
+        self.duration = duration
+        self.start_time = pygame.time.get_ticks()
+        self.surface = pygame.Surface(screen.get_size())
+        self.surface.fill(color)
+        self.done = False
 
-def fade_out(screen, color=(0, 0, 0), speed=5):
-    fade = pygame.Surface((WIDTH, HEIGHT))
-    fade.fill(color)
-    for alpha in range(0, 256, speed):
-        fade.set_alpha(alpha)
-        screen.blit(fade, (0, 0))
-        pygame.display.update()
-        pygame.time.delay(10)
+    def update(self):
+        elapsed = pygame.time.get_ticks() - self.start_time
+        progress = min(1, elapsed / self.duration)
+        if self.direction == "in":
+            # De 255 a 0: se va haciendo transparente
+            alpha = 255 * (1 - progress)
+        else:
+            # De 0 a 255: se va oscureciendo
+            alpha = 255 * progress
+        self.surface.set_alpha(alpha)
+        self.screen.blit(self.surface, (0, 0))
+        if progress >= 1:
+            self.done = True
+
+def fade_in_nonblocking(screen, duration=500, color=(0, 0, 0)):
+    fade = FadeTransition(screen, direction="in", color=color, duration=duration)
+    clock = pygame.time.Clock()
+    # Se asume que la escena detrás del fade ya está dibujada
+    while not fade.done:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); exit()
+        fade.update()
+        pygame.display.flip()
+        clock.tick(FPS)
+
+def fade_out_nonblocking(screen, duration=500, color=(0, 0, 0)):
+    fade = FadeTransition(screen, direction="out", color=color, duration=duration)
+    clock = pygame.time.Clock()
+    while not fade.done:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); exit()
+        fade.update()
+        pygame.display.flip()
+        clock.tick(FPS)
 
 # =============================================================================
 # Función para dibujar la barra de salud con feedback visual al recibir daño
-# Se agrega el parámetro flash para alternar el color al recibir daño.
 # =============================================================================
 def draw_health_bar(surface, x, y, health, max_health, flash=False):
     BAR_WIDTH = 150
     BAR_HEIGHT = 20
     fill = (health / max_health) * BAR_WIDTH
-    # Si se activa el flag flash, se alterna el color de la barra (parpadeo)
     if flash:
         if (pygame.time.get_ticks() // 100) % 2 == 0:
             bar_color = YELLOW
@@ -129,7 +163,7 @@ def get_combined_keys():
     if joystick:
         axis_x = joystick.get_axis(0)
         axis_y = joystick.get_axis(1)
-        threshold = 0.3  # Umbral para evitar fluctuaciones
+        threshold = 0.3
         if axis_x < -threshold:
             keys_combined[pygame.K_LEFT] = True
         if axis_x > threshold:
@@ -181,7 +215,8 @@ def show_story():
                 pygame.quit(); exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    fade_out(screen)  # Transición de salida
+                    # Aplicar fade out no bloqueante
+                    fade_out_nonblocking(screen)
                     waiting = False
 
 # =============================================================================
@@ -364,7 +399,6 @@ class Player(pygame.sprite.Sprite):
         self.shoot_cooldown = 200  
         self.last_shot_time = 0
         self.score = 0
-        # Atributos para feedback visual al recibir daño
         self.flash_timer = 0
         self.is_flashing = False
 
@@ -539,8 +573,8 @@ def main_menu(sound_enabled):
         background = pygame.Surface((WIDTH, HEIGHT))
         background.fill(WHITE)
     
-    # Aplicamos fade in al iniciar el menú
-    fade_in(screen)
+    # Aplicar fade in no bloqueante al iniciar el menú
+    fade_in_nonblocking(screen)
     
     while menu_running:
         screen.blit(background, (0, 0))
@@ -558,7 +592,8 @@ def main_menu(sound_enabled):
                     selected_option = (selected_option + 1) % len(menu_options)
                 elif event.key == pygame.K_RETURN:
                     if selected_option == 0:
-                        fade_out(screen)  # Transición al iniciar el juego
+                        # Fade out no bloqueante al iniciar el juego
+                        fade_out_nonblocking(screen)
                         return "start", sound_enabled
                     elif selected_option == 1:
                         sound_enabled = not sound_enabled
@@ -660,7 +695,6 @@ def game_loop():
                 enemy.move(player, grid, len(grid[0]), len(grid))
                 if enemy.rect.colliderect(player.rect):
                     player.health -= 1
-                    # Activar efecto de parpadeo al recibir daño
                     player.is_flashing = True
                     player.flash_timer = pygame.time.get_ticks()
                 if pygame.sprite.spritecollide(enemy, bullet_group, True):
@@ -673,7 +707,6 @@ def game_loop():
 
             player_global_score = player.score
 
-            # Actualizar efecto de parpadeo: se desactiva después de 300ms
             if player.is_flashing and pygame.time.get_ticks() - player.flash_timer > 300:
                 player.is_flashing = False
 
@@ -685,7 +718,6 @@ def game_loop():
             pygame.draw.rect(screen, GREEN, goal_rect)
             all_sprites.draw(screen)
             draw_text(f"Monedas: {player.coins_collected}", 10, 10, RED)
-            # Se pasa el flag flash para la barra de salud
             draw_health_bar(screen, WIDTH - 170, 10, player.health, 100, flash=player.is_flashing)
             draw_text(f"Nivel: {level}", WIDTH - 150, 50, RED)
             draw_text(f"Puntos: {player.score}", 10, 50, BLUE)
@@ -695,7 +727,6 @@ def game_loop():
             if player.health <= 0:
                 game_over = True
 
-        # PANTALLA DE RESULTADOS CON FONDO, CENTRADA Y CON MÁS ESPACIO ENTRE LÍNEAS
         try:
             results_bg = pygame.image.load("results background.jpg").convert()
             results_bg = pygame.transform.scale(results_bg, (WIDTH, HEIGHT))
@@ -734,7 +765,7 @@ def game_loop():
         pygame.time.wait(3000)
         
         if win:
-            fade_out(screen)  # Transición antes de iniciar el siguiente nivel
+            fade_out_nonblocking(screen)  # Transición antes de iniciar el siguiente nivel
             level += 1
             if level > 3:
                 screen.fill(WHITE)
