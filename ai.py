@@ -2,7 +2,7 @@
 import pygame
 import math
 import heapq
-from config import CELL_SIZE
+from src.settings import CELL_SIZE
 
 # --- A* y manejo del grid ---
 class Node:

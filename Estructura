@@ -44,16 +44,10 @@ def draw_text(text, x, y, color=BLACK):
     screen.blit(render, (x, y))
 
 # =============================================================================
-# TRANSICIONES NO BLOQUEANTES: Clase para Fade In / Fade Out
+# TRANSICIONES NO BLOQUEANTES: Fade In / Fade Out
 # =============================================================================
 class FadeTransition:
     def __init__(self, screen, direction="in", color=(0, 0, 0), duration=500):
-        """
-        :param screen: Superficie sobre la que se dibuja el fade.
-        :param direction: "in" para fade in (de opaco a transparente) o "out" para fade out.
-        :param color: Color de la transición.
-        :param duration: Duración de la transición en milisegundos.
-        """
         self.screen = screen
         self.direction = direction
         self.color = color
@@ -67,10 +61,8 @@ class FadeTransition:
         elapsed = pygame.time.get_ticks() - self.start_time
         progress = min(1, elapsed / self.duration)
         if self.direction == "in":
-            # De 255 a 0: se va haciendo transparente
             alpha = 255 * (1 - progress)
         else:
-            # De 0 a 255: se va oscureciendo
             alpha = 255 * progress
         self.surface.set_alpha(alpha)
         self.screen.blit(self.surface, (0, 0))
@@ -80,7 +72,6 @@ class FadeTransition:
 def fade_in_nonblocking(screen, duration=500, color=(0, 0, 0)):
     fade = FadeTransition(screen, direction="in", color=color, duration=duration)
     clock = pygame.time.Clock()
-    # Se asume que la escena detrás del fade ya está dibujada
     while not fade.done:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -101,7 +92,7 @@ def fade_out_nonblocking(screen, duration=500, color=(0, 0, 0)):
         clock.tick(FPS)
 
 # =============================================================================
-# Función para dibujar la barra de salud con feedback visual al recibir daño
+# Barra de salud con feedback visual
 # =============================================================================
 def draw_health_bar(surface, x, y, health, max_health, flash=False):
     BAR_WIDTH = 150
@@ -119,7 +110,7 @@ def draw_health_bar(surface, x, y, health, max_health, flash=False):
     pygame.draw.rect(surface, BLACK, (x, y, BAR_WIDTH, BAR_HEIGHT), 2)
 
 # =============================================================================
-# Funciones para la música (Carga, Reproducción y Detención)
+# Funciones para la música
 # =============================================================================
 def load_music(path, volume=0.5):
     global music_available
@@ -144,13 +135,12 @@ def stop_music():
     if music_available:
         pygame.mixer.music.stop()
 
-# Cargar la música de fondo usando el archivo "musica.mp3"
 load_music("musica.mp3", volume=0.5)
 if music_available:
     play_music()
 
 # =============================================================================
-# Función para combinar entradas de teclado y joystick
+# Combinar entradas de teclado y joystick
 # =============================================================================
 def get_combined_keys():
     kb = pygame.key.get_pressed()
@@ -175,7 +165,7 @@ def get_combined_keys():
     return keys_combined
 
 # =============================================================================
-# PANTALLA DE HISTORIA / INTRODUCCIÓN CON TRANSICIÓN
+# Pantalla de historia / introducción
 # =============================================================================
 def show_story():
     try:
@@ -189,10 +179,10 @@ def show_story():
         "Bienvenido a New Rally X",
         "",
         "La tierra ha sido invadida por enemigos misteriosos",
-        "y la unica esperanza es recolectar monedas magicas",
+        "y la única esperanza es recolectar monedas mágicas",
         "y derrotar a los invasores.",
         "",
-        "Tu mision: Explora, combate y recoge monedas",
+        "Tu misión: Explora, combate y recoge monedas",
         "para restaurar la paz en tu mundo.",
         "",
         "Presiona ENTER para comenzar..."
@@ -215,35 +205,28 @@ def show_story():
                 pygame.quit(); exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    # Aplicar fade out no bloqueante
                     fade_out_nonblocking(screen)
                     waiting = False
 
 # =============================================================================
-# CLASES Y FUNCIONES PARA EL MAPA Y A*
+# CLASES Y FUNCIONES PARA EL MAPA Y PATHFINDING
 # =============================================================================
 class Node:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.blocked = False  
+        self.blocked = False  # Se actualizará con los obstáculos
         self.g = float('inf')
         self.h = 0
         self.f = float('inf')
         self.parent = None
-
     def __lt__(self, other):
         return self.f < other.f
-
     def __hash__(self):
         return hash((self.x, self.y))
 
-def create_specific_map(width, height, obstacles_coords):
-    grid = [[Node(x, y) for x in range(width)] for y in range(height)]
-    for (x, y) in obstacles_coords:
-        if 0 <= x < width and 0 <= y < height:
-            grid[y][x].blocked = True
-    return grid
+def create_empty_grid(width, height):
+    return [[Node(x, y) for x in range(width)] for y in range(height)]
 
 def copy_grid(grid):
     new_grid = []
@@ -287,25 +270,22 @@ def a_star(start, goal, grid, width, height):
                     heapq.heappush(open_list, (neighbor.f, neighbor))
     return None
 
-def generate_coins(grid, num_coins):
-    coins = []
-    rows = len(grid)
-    cols = len(grid[0])
-    possible_positions = []
-    for y in range(rows):
-        for x in range(cols):
-            if not grid[y][x].blocked:
-                possible_positions.append((x, y))
-    random.shuffle(possible_positions)
-    for i in range(min(num_coins, len(possible_positions))):
-        cell = possible_positions[i]
-        coin = Coin(cell[0] * CELL_SIZE + (CELL_SIZE - 45) // 2,
-                    cell[1] * CELL_SIZE + (CELL_SIZE - 45) // 2)
-        coins.append(coin)
-    return coins
+def get_level_data(level):
+    if level == 1:
+        enemy_count = 5
+    elif level == 2:
+        enemy_count = 7
+    elif level == 3:
+        enemy_count = 10
+    else:
+        return None, None, 0
+    grid_width, grid_height = 20, 15
+    grid = create_empty_grid(grid_width, grid_height)
+    coins = []  # Las monedas se generan como decoración
+    return grid, coins, enemy_count
 
 # =============================================================================
-# CLASES DE COMPORTAMIENTO
+# CLASES DE COMPORTAMIENTO (IA)
 # =============================================================================
 class BehaviorNode:
     def run(self, enemy, player, grid, grid_width, grid_height):
@@ -348,17 +328,32 @@ def condition_player_close(enemy, player, grid, grid_width, grid_height):
     return math.hypot(dx, dy) < 200
 
 def chase_action(enemy, player, grid, grid_width, grid_height):
-    grid_copy = copy_grid(grid)
+    current_time = pygame.time.get_ticks()
     enemy_cell = (enemy.rect.centerx // CELL_SIZE, enemy.rect.centery // CELL_SIZE)
     player_cell = (player.rect.centerx // CELL_SIZE, player.rect.centery // CELL_SIZE)
-    start = grid_copy[int(enemy_cell[1])][int(enemy_cell[0])]
-    goal = grid_copy[int(player_cell[1])][int(player_cell[0])]
-    path = a_star(start, goal, grid_copy, grid_width, grid_height)
+    recalc_needed = False
+    if current_time - enemy.last_path_calc_time > enemy.path_recalc_interval:
+        recalc_needed = True
+    if enemy.last_target_position is None:
+        recalc_needed = True
+    else:
+        if abs(player_cell[0] - enemy.last_target_position[0]) > 1 or abs(player_cell[1] - enemy.last_target_position[1]) > 1:
+            recalc_needed = True
+    if recalc_needed:
+        grid_copy = copy_grid(grid)
+        start = grid_copy[enemy_cell[1]][enemy_cell[0]]
+        goal = grid_copy[player_cell[1]][player_cell[0]]
+        path = a_star(start, goal, grid_copy, grid_width, grid_height)
+        enemy.cached_path = path if path is not None else []
+        enemy.last_path_calc_time = current_time
+        enemy.last_target_position = player_cell
+    else:
+        path = enemy.cached_path
     if path and len(path) > 1:
         next_cell = path[1]
         target_vector = pygame.math.Vector2(next_cell[0] * CELL_SIZE + CELL_SIZE // 2,
                                             next_cell[1] * CELL_SIZE + CELL_SIZE // 2)
-        move_vector = target_vector - pygame.math.Vector2(enemy.rect.center)
+        move_vector = target_vector - enemy.pos
         if move_vector.length() != 0:
             enemy.pos += move_vector.normalize() * enemy.speed
     else:
@@ -378,7 +373,7 @@ def patrol_action(enemy, player, grid, grid_width, grid_height):
         enemy.pos += move_vector.normalize() * enemy.speed
 
 # =============================================================================
-# CLASES DE SPRITES (Player, Bullet, Enemy, Coin)
+# CLASES DE SPRITES: Player, Bullet, Enemy, Coin
 # =============================================================================
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -417,7 +412,6 @@ class Player(pygame.sprite.Sprite):
         if keys[pygame.K_DOWN]:
             dy = self.speed
             self.angle = 90
-
         self.rect.x += dx
         if self.rect.left < 0:
             self.rect.left = 0
@@ -425,7 +419,6 @@ class Player(pygame.sprite.Sprite):
             self.rect.right = WIDTH
         if any(ob.rect.colliderect(self.rect) for ob in obstacles):
             self.rect.x = original_rect.x
-
         self.rect.y += dy
         if self.rect.top < 0:
             self.rect.top = 0
@@ -433,7 +426,6 @@ class Player(pygame.sprite.Sprite):
             self.rect.bottom = HEIGHT
         if any(ob.rect.colliderect(self.rect) for ob in obstacles):
             self.rect.y = original_rect.y
-
         self.image = pygame.transform.rotate(self.original_image, self.angle)
         self.rect = self.image.get_rect(center=self.rect.center)
 
@@ -445,7 +437,6 @@ class Bullet(pygame.sprite.Sprite):
         self.image = pygame.Surface((10, 10))
         self.image.fill(YELLOW)
         self.rect = self.image.get_rect(center=(x, y))
-    
     def update(self):
         if self.angle == 0:
             self.rect.x += self.speed
@@ -469,25 +460,40 @@ class Enemy(pygame.sprite.Sprite):
         self.image = self.original_image.copy()
         self.rect = self.image.get_rect(topleft=(x, y))
         self.pos = pygame.math.Vector2(x, y)
-        self.speed = 2
+        # Se ha reducido la velocidad de 2 a 1.5 para moderar su movimiento
+        self.speed = 1.5  
         self.patrol_points = [
             pygame.math.Vector2(x, y),
             pygame.math.Vector2(random.randint(200, WIDTH - 200), random.randint(200, HEIGHT - 200))
         ]
         self.current_patrol_point = 1
         self.behavior_tree = ai_tree
+        self.last_path_calc_time = 0
+        self.path_recalc_interval = 500  # en milisegundos
+        self.cached_path = []
+        self.last_target_position = None
 
-    def move(self, player, grid, grid_width, grid_height):
+    def move(self, player, grid, grid_width, grid_height, obstacles):
+        old_position = self.pos.copy()
         self.behavior_tree.run(self, player, grid, grid_width, grid_height)
-        self.rect.center = (int(self.pos.x), int(self.pos.y))
-        if self.rect.left < 0:
-            self.rect.left = 0; self.pos.x = self.rect.left
-        if self.rect.right > WIDTH:
-            self.rect.right = WIDTH; self.pos.x = self.rect.right - self.rect.width
-        if self.rect.top < 0:
-            self.rect.top = 0; self.pos.y = self.rect.top
-        if self.rect.bottom > HEIGHT:
-            self.rect.bottom = HEIGHT; self.pos.y = self.rect.bottom - self.rect.height
+        new_position = self.pos.copy()
+        move_vector = new_position - old_position
+        # Mover en cada eje por separado
+        old_x = self.pos.x
+        old_y = self.pos.y
+        self.pos.x = old_x + move_vector.x
+        self.rect.centerx = int(self.pos.x)
+        if pygame.sprite.spritecollide(self, obstacles, False):
+            self.pos.x = old_x
+            self.rect.centerx = int(old_x)
+        self.pos.y = old_y + move_vector.y
+        self.rect.centery = int(self.pos.y)
+        if pygame.sprite.spritecollide(self, obstacles, False):
+            self.pos.y = old_y
+            self.rect.centery = int(old_y)
+        # Si no se movió, forzar recalculación de ruta
+        if self.pos == old_position:
+            self.last_path_calc_time = 0
 
 class Coin(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -502,66 +508,70 @@ class Coin(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
 # =============================================================================
-# CLASE DE OBSTÁCULOS CON FORMAS VARIADAS
+# CLASE DE OBSTÁCULOS CON IMAGEN (decorativos y colisionables)
 # =============================================================================
-class VariedObstacle(pygame.sprite.Sprite):
-    def __init__(self, x, y, width, height, shape="rectangle"):
+class ImageObstacle(pygame.sprite.Sprite):
+    def __init__(self, x, y, size):
         super().__init__()
-        self.shape = shape
-        self.image = pygame.Surface((width, height), pygame.SRCALPHA)
-        if shape in ["rectangle", "square"]:
-            pygame.draw.rect(self.image, BLACK, (0, 0, width, height))
-        elif shape == "ellipse":
-            pygame.draw.ellipse(self.image, BLACK, (0, 0, width, height))
+        try:
+            self.image = pygame.image.load("obstaculo.jpg").convert_alpha()
+            self.image = pygame.transform.scale(self.image, (size, size))
+        except pygame.error:
+            print("No se pudo cargar 'obstaculo.jpg'. Usando superficie de reemplazo.")
+            self.image = pygame.Surface((size, size))
+            self.image.fill(BLACK)
         self.rect = self.image.get_rect(topleft=(x, y))
+
+# =============================================================================
+# GENERACIÓN DE DECORACIONES DISPERSAS (obstáculos y monedas) CON RESTRICCIONES
+# =============================================================================
+def generate_decorations(num_obstacles=10, num_coins=10, min_distance=15):
+    deco_obstacles = []
+    deco_coins = []
+    margin = 20
+    full_rect = pygame.Rect(margin, margin, WIDTH - 2 * margin, HEIGHT - 2 * margin)
+    # Áreas prohibidas: posición de inicio y meta
+    start_rect = pygame.Rect(100, 100, 55, 55)
+    goal_rect = pygame.Rect(WIDTH - 100, HEIGHT - 100, 50, 50)
+    # Generar obstáculos
+    attempts = 0
+    while len(deco_obstacles) < num_obstacles and attempts < 1000:
+        x = random.randint(full_rect.left, full_rect.right - CELL_SIZE)
+        y = random.randint(full_rect.top, full_rect.bottom - CELL_SIZE)
+        new_rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
+        if new_rect.colliderect(start_rect) or new_rect.colliderect(goal_rect):
+            attempts += 1
+            continue
+        collision = False
+        for obs in deco_obstacles:
+            if new_rect.colliderect(obs.rect.inflate(min_distance, min_distance)):
+                collision = True
+                break
+        if not collision:
+            obs = ImageObstacle(x, y, CELL_SIZE)
+            deco_obstacles.append(obs)
+        attempts += 1
+    # Generar monedas (sin restricción de áreas)
+    attempts = 0
+    coin_size = 45
+    while len(deco_coins) < num_coins and attempts < 1000:
+        x = random.randint(full_rect.left, full_rect.right - coin_size)
+        y = random.randint(full_rect.top, full_rect.bottom - coin_size)
+        new_rect = pygame.Rect(x, y, coin_size, coin_size)
+        collision = False
+        for coin in deco_coins:
+            if new_rect.colliderect(coin.rect.inflate(min_distance, min_distance)):
+                collision = True
+                break
+        if not collision:
+            coin = Coin(x, y)
+            deco_coins.append(coin)
+        attempts += 1
+    return deco_obstacles, deco_coins
 
 # =============================================================================
 # FUNCIONES DE NIVEL, MENÚ Y BUCLE PRINCIPAL DEL JUEGO
 # =============================================================================
-def get_level_data(level):
-    if level == 1:
-        grid_width, grid_height = 20, 15
-        num_coins = 10
-        enemy_count = 5
-        num_obstacles = 10
-    elif level == 2:
-        grid_width, grid_height = 25, 20
-        num_coins = 15
-        enemy_count = 7
-        num_obstacles = 15
-    elif level == 3:
-        grid_width, grid_height = 30, 25
-        num_coins = 20
-        enemy_count = 10
-        num_obstacles = 20
-    else:
-        return None, None, 0
-
-    safe_zone = {(x, y) for x in range(4) for y in range(4)}
-    
-    goal_rect = pygame.Rect(WIDTH - 100, HEIGHT - 100, 50, 50)
-    goal_zone = set()
-    for y in range(grid_height):
-        for x in range(grid_width):
-            cell_rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-            if cell_rect.colliderect(goal_rect):
-                goal_zone.add((x, y))
-    
-    forbidden = safe_zone.union(goal_zone)
-    
-    obstacles = set()
-    while len(obstacles) < num_obstacles:
-        x = random.randint(0, grid_width - 1)
-        y = random.randint(0, grid_height - 1)
-        if (x, y) in forbidden:
-            continue
-        obstacles.add((x, y))
-    obstacles = list(obstacles)
-
-    grid = create_specific_map(grid_width, grid_height, obstacles)
-    coins = generate_coins(grid, num_coins)
-    return grid, coins, enemy_count
-
 def main_menu(sound_enabled):
     menu_running = True
     menu_options = ["Empezar Juego", f"Sonido: {'ON' if sound_enabled else 'OFF'}", "Salir"]
@@ -572,10 +582,7 @@ def main_menu(sound_enabled):
     except pygame.error:
         background = pygame.Surface((WIDTH, HEIGHT))
         background.fill(WHITE)
-    
-    # Aplicar fade in no bloqueante al iniciar el menú
     fade_in_nonblocking(screen)
-    
     while menu_running:
         screen.blit(background, (0, 0))
         for i, option in enumerate(menu_options):
@@ -592,7 +599,6 @@ def main_menu(sound_enabled):
                     selected_option = (selected_option + 1) % len(menu_options)
                 elif event.key == pygame.K_RETURN:
                     if selected_option == 0:
-                        # Fade out no bloqueante al iniciar el juego
                         fade_out_nonblocking(screen)
                         return "start", sound_enabled
                     elif selected_option == 1:
@@ -615,42 +621,29 @@ def game_loop():
     except pygame.error:
         bg_image = pygame.Surface((WIDTH, HEIGHT))
         bg_image.fill(WHITE)
-    
     running = True
     while running:
-        grid, coins_list, enemy_count = get_level_data(level)
+        grid, _, enemy_count = get_level_data(level)
         all_sprites = pygame.sprite.Group()
         enemy_group = pygame.sprite.Group()
         coin_group = pygame.sprite.Group()
         bullet_group = pygame.sprite.Group()
-        obstacle_group = pygame.sprite.Group()
-        
-        for y in range(len(grid)):
-            for x in range(len(grid[y])):
-                if grid[y][x].blocked:
-                    obs = pygame.sprite.Sprite()
-                    obs.image = pygame.Surface((CELL_SIZE, CELL_SIZE))
-                    obs.image.fill(BLACK)
-                    obs.rect = obs.image.get_rect(topleft=(x * CELL_SIZE, y * CELL_SIZE))
-                    obstacle_group.add(obs)
-                    all_sprites.add(obs)
-        
-        for _ in range(2):
-            w = random.randint(60, 120)
-            h = random.randint(40, 100)
-            x = random.randint(150, WIDTH - w - 10)
-            y = random.randint(150, HEIGHT - h - 10)
-            shape = random.choice(["rectangle", "square"])
-            custom_obs = VariedObstacle(x, y, w, h, shape)
-            obstacle_group.add(custom_obs)
-            all_sprites.add(custom_obs)
-        
-        player = Player()
-        all_sprites.add(player)
-        for coin in coins_list:
+        # Generar decoración dispersa en toda la pantalla
+        deco_obstacles, deco_coins = generate_decorations(num_obstacles=10, num_coins=10, min_distance=15)
+        # Actualizar el grid: marcar celdas bloqueadas donde hay obstáculos
+        for obs in deco_obstacles:
+            cell_x = obs.rect.x // CELL_SIZE
+            cell_y = obs.rect.y // CELL_SIZE
+            if 0 <= cell_x < len(grid[0]) and 0 <= cell_y < len(grid):
+                grid[cell_y][cell_x].blocked = True
+        obstacles_group = pygame.sprite.Group(deco_obstacles)
+        for obs in deco_obstacles:
+            all_sprites.add(obs)
+        for coin in deco_coins:
             coin_group.add(coin)
             all_sprites.add(coin)
-        
+        player = Player()
+        all_sprites.add(player)
         ai_tree = SelectorNode([
             SequenceNode([
                 ConditionNode(condition_player_close),
@@ -658,17 +651,29 @@ def game_loop():
             ]),
             ActionNode(patrol_action)
         ])
+        # Generar enemigos evitando que aparezcan sobre obstáculos
         for _ in range(enemy_count):
-            ex = random.randint(5, 20) * CELL_SIZE
-            ey = random.randint(5, 15) * CELL_SIZE
-            enemy = Enemy(ex, ey, ai_tree)
-            enemy_group.add(enemy)
-            all_sprites.add(enemy)
-        
+            valid = False
+            attempts = 0
+            while not valid and attempts < 100:
+                ex = random.randint(5, 20) * CELL_SIZE
+                ey = random.randint(5, 15) * CELL_SIZE
+                enemy_rect = pygame.Rect(ex, ey, 50, 50)
+                collision = False
+                for obs in obstacles_group:
+                    if enemy_rect.colliderect(obs.rect):
+                        collision = True
+                        break
+                if not collision:
+                    valid = True
+                attempts += 1
+            if valid:
+                enemy = Enemy(ex, ey, ai_tree)
+                enemy_group.add(enemy)
+                all_sprites.add(enemy)
         goal_rect = pygame.Rect(WIDTH - 100, HEIGHT - 100, 50, 50)
         game_over = False
         win = False
-
         while not game_over and not win:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -681,18 +686,15 @@ def game_loop():
                             bullet_group.add(bullet)
                             all_sprites.add(bullet)
                             player.last_shot_time = now
-
             keys = get_combined_keys()
-            player.move(keys, obstacle_group)
-
+            player.move(keys, obstacles_group)
             for bullet in bullet_group:
                 bullet.update()
                 if (bullet.rect.right < 0 or bullet.rect.left > WIDTH or 
                     bullet.rect.bottom < 0 or bullet.rect.top > HEIGHT):
                     bullet.kill()
-
             for enemy in enemy_group:
-                enemy.move(player, grid, len(grid[0]), len(grid))
+                enemy.move(player, grid, len(grid[0]), len(grid), obstacles_group)
                 if enemy.rect.colliderect(player.rect):
                     player.health -= 1
                     player.is_flashing = True
@@ -700,20 +702,14 @@ def game_loop():
                 if pygame.sprite.spritecollide(enemy, bullet_group, True):
                     enemy.kill()
                     player.score += 100
-
             coins_collected = pygame.sprite.spritecollide(player, coin_group, True)
             player.coins_collected += len(coins_collected)
             player.score += 50 * len(coins_collected)
-
-            player_global_score = player.score
-
             if player.is_flashing and pygame.time.get_ticks() - player.flash_timer > 300:
                 player.is_flashing = False
-
             if player.rect.colliderect(goal_rect) or len(coin_group) == 0:
                 win = True
                 player.score += 500
-
             screen.blit(bg_image, (0, 0))
             pygame.draw.rect(screen, GREEN, goal_rect)
             all_sprites.draw(screen)
@@ -723,10 +719,8 @@ def game_loop():
             draw_text(f"Puntos: {player.score}", 10, 50, BLUE)
             pygame.display.flip()
             clock.tick(FPS)
-
             if player.health <= 0:
                 game_over = True
-
         try:
             results_bg = pygame.image.load("results background.jpg").convert()
             results_bg = pygame.transform.scale(results_bg, (WIDTH, HEIGHT))
@@ -746,7 +740,6 @@ def game_loop():
         else:
             end_message = "¡Perdiste!"
             achievement = "Sin logros"
-        
         results_text = [
             (end_message, RED),
             (f"Puntuación: {player.score}", BLUE),
@@ -755,7 +748,6 @@ def game_loop():
         line_height = 60
         total_text_height = len(results_text) * line_height
         start_y = (HEIGHT - total_text_height) // 2
-        
         screen.blit(results_bg, (0, 0))
         for idx, (line, color) in enumerate(results_text):
             text_surface = font.render(line, True, color)
@@ -763,9 +755,8 @@ def game_loop():
             screen.blit(text_surface, text_rect)
         pygame.display.flip()
         pygame.time.wait(3000)
-        
         if win:
-            fade_out_nonblocking(screen)  # Transición antes de iniciar el siguiente nivel
+            fade_out_nonblocking(screen)
             level += 1
             if level > 3:
                 screen.fill(WHITE)

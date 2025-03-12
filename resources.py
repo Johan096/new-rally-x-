@@ -1,7 +1,7 @@
 # resources.py
 import os
 import pygame
-from config import RED
+from src.settings import RED
 
 _image_cache = {}
 
