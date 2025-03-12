@@ -4,7 +4,7 @@ import math
 import heapq
 import os
 
-# Inicialización de Pygame, audio y joystick
+# Inicialización de Pygame, audio y joystick           (Johan 22-sisn-2-41)
 pygame.init()
 try:
     pygame.mixer.init()
@@ -20,16 +20,16 @@ if pygame.joystick.get_count() > 0:
 else:
     joystick = None
 
-# Configuración de pantalla
+# Configuración de pantalla                  (johan  22-sisn-2-041)
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("New Rally X")
 
-# Constantes
+# Constantes     (johan 22-sisn-2-041)
 FPS = 60
 CELL_SIZE = 40
 
-# Colores
+# Colores       johan(22-sisn-2-041)
 WHITE  = (255, 255, 255)
 RED    = (255, 0, 0)
 BLUE   = (0, 0, 255)
@@ -44,7 +44,7 @@ def draw_text(text, x, y, color=BLACK):
     screen.blit(render, (x, y))
 
 # =============================================================================
-# TRANSICIONES NO BLOQUEANTES: Fade In / Fade Out
+# TRANSICIONES NO BLOQUEANTES: Fade In / Fade Out               (johan  22-sisn-2-041)
 # =============================================================================
 class FadeTransition:
     def __init__(self, screen, direction="in", color=(0, 0, 0), duration=500):
@@ -92,7 +92,7 @@ def fade_out_nonblocking(screen, duration=500, color=(0, 0, 0)):
         clock.tick(FPS)
 
 # =============================================================================
-# Barra de salud con feedback visual
+# Barra de salud con feedback visual                    (johan  22-sisn-2-041)
 # =============================================================================
 def draw_health_bar(surface, x, y, health, max_health, flash=False):
     BAR_WIDTH = 150
@@ -110,7 +110,7 @@ def draw_health_bar(surface, x, y, health, max_health, flash=False):
     pygame.draw.rect(surface, BLACK, (x, y, BAR_WIDTH, BAR_HEIGHT), 2)
 
 # =============================================================================
-# Funciones para la música
+# Funciones para la música                        (johan  22-sisn-2-041)
 # =============================================================================
 def load_music(path, volume=0.5):
     global music_available
@@ -140,7 +140,7 @@ if music_available:
     play_music()
 
 # =============================================================================
-# Combinar entradas de teclado y joystick
+# Combinar entradas de teclado y joystick                (johan-sisn-2-041)
 # =============================================================================
 def get_combined_keys():
     kb = pygame.key.get_pressed()
@@ -165,7 +165,7 @@ def get_combined_keys():
     return keys_combined
 
 # =============================================================================
-# Pantalla de historia / introducción
+# Pantalla de historia / introducción               (Johan 22-sisn-2-041)
 # =============================================================================
 def show_story():
     try:
@@ -209,7 +209,7 @@ def show_story():
                     waiting = False
 
 # =============================================================================
-# CLASES Y FUNCIONES PARA EL MAPA Y PATHFINDING
+# CLASES Y FUNCIONES PARA EL MAPA Y PATHFINDING              (johan  22-sisn-041)
 # =============================================================================
 class Node:
     def __init__(self, x, y):
@@ -285,7 +285,7 @@ def get_level_data(level):
     return grid, coins, enemy_count
 
 # =============================================================================
-# CLASES DE COMPORTAMIENTO (IA)
+# CLASES DE COMPORTAMIENTO (IA)                         (johan  22-sisn-2-041)
 # =============================================================================
 class BehaviorNode:
     def run(self, enemy, player, grid, grid_width, grid_height):
@@ -373,7 +373,7 @@ def patrol_action(enemy, player, grid, grid_width, grid_height):
         enemy.pos += move_vector.normalize() * enemy.speed
 
 # =============================================================================
-# CLASES DE SPRITES: Player, Bullet, Enemy, Coin
+# CLASES DE SPRITES: Player, Bullet, Enemy, Coin              (johan  22-sisn-2-041)
 # =============================================================================
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -508,7 +508,7 @@ class Coin(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
 # =============================================================================
-# CLASE DE OBSTÁCULOS CON IMAGEN (decorativos y colisionables)
+# CLASE DE OBSTÁCULOS CON IMAGEN (decorativos y colisionables)          (johan  22-sisn-2-041)
 # =============================================================================
 class ImageObstacle(pygame.sprite.Sprite):
     def __init__(self, x, y, size):
@@ -523,7 +523,7 @@ class ImageObstacle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
 # =============================================================================
-# GENERACIÓN DE DECORACIONES DISPERSAS (obstáculos y monedas) CON RESTRICCIONES
+# GENERACIÓN DE DECORACIONES DISPERSAS (obstáculos y monedas) CON RESTRICCIONES      (johan  22-sisn-2-041)
 # =============================================================================
 def generate_decorations(num_obstacles=10, num_coins=10, min_distance=15):
     deco_obstacles = []
@@ -570,7 +570,7 @@ def generate_decorations(num_obstacles=10, num_coins=10, min_distance=15):
     return deco_obstacles, deco_coins
 
 # =============================================================================
-# FUNCIONES DE NIVEL, MENÚ Y BUCLE PRINCIPAL DEL JUEGO
+# FUNCIONES DE NIVEL, MENÚ Y BUCLE PRINCIPAL DEL JUEGO     (johan  22-sisn-2-041)
 # =============================================================================
 def main_menu(sound_enabled):
     menu_running = True
